@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { tracksOf, dropPassengers } from './motion.mjs';
 
 const INPAGE = await readFile(new URL('./inpage.js', import.meta.url), 'utf8');
@@ -12,6 +13,7 @@ const EPOCH = Date.UTC(2026, 0, 1);
 const MAX_H = 8000; // ponytail: stills are cut at 8000px; capture long pages per section with --selector
 const pad = (k) => String(k).padStart(4, '0');
 export const vpName = (vp) => `${vp.width}x${vp.height}`;
+export const browserInstallCommand = (scriptsDir = fileURLToPath(new URL('..', import.meta.url))) => `npx --prefix "${scriptsDir}" playwright install chromium`;
 
 export async function launch() {
   try {
@@ -20,7 +22,7 @@ export async function launch() {
     try {
       return await chromium.launch({ channel: 'chrome' });
     } catch {
-      throw new Error(`No browser available. Run once:\n  npx --prefix "${new URL('..', import.meta.url).pathname}" playwright install chromium\n\n${bundled.message}`);
+      throw new Error(`No browser available. Run once:\n  ${browserInstallCommand()}\n\n${bundled.message}`);
     }
   }
 }

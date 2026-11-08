@@ -14,9 +14,10 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const cli = new URL('../replica.mjs', import.meta.url).pathname;
-const fixture = (f) => new URL(`./fixtures/${f}`, import.meta.url).pathname;
+const cli = fileURLToPath(new URL('../replica.mjs', import.meta.url));
+const fixture = (f) => fileURLToPath(new URL(`./fixtures/${f}`, import.meta.url));
 const dir = await mkdtemp(join(tmpdir(), 'replica-test-'));
 const run = (...args) => {
   try {

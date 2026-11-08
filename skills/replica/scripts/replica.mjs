@@ -150,6 +150,11 @@ async function compare(refDir, cloneSrc, f) {
   const level = f.level || meta.level;
   if (!LEVELS[level]) throw new Error(`--level must be one of ${Object.keys(LEVELS).join(', ')}`);
   const { tol, gate } = LEVELS[level];
+  const available = new Set(meta.kind === 'url' ? ['layout', 'style', 'pixels'] : ['pixels']);
+  if (meta.opts.motion > 0) available.add('motion');
+  if (!Object.entries(gate).some(([axis, threshold]) => threshold != null && available.has(axis))) {
+    throw new Error(`No applicable gated axes for this ${meta.kind} reference at the ${level} level. Use --level faithful or exact to compare pixels, or capture a URL reference for layout and style comparison.`);
+  }
   const parent = dirname(refDir);
   const done = (await readdir(parent)).filter((d) => /^round-\d+$/.test(d)).map((d) => +d.slice(6));
   const round = Math.max(0, ...done) + 1;
@@ -294,9 +299,11 @@ async function compare(refDir, cloneSrc, f) {
 
 async function compareMotion(lab, meta, refDir, out, cloneMotion, tol, structural) {
   const refMotion = await readJson(join(refDir, 'motion', 'motion.json'));
+  // Raster comparison fills the gap only when neither side exposes DOM motion tracks.
+  const rasterFallback = meta.kind === 'url' && !refMotion.tracks.length && !cloneMotion.tracks.length;
   const n = Math.min(refMotion.times.length, cloneMotion.times.length);
   const times = refMotion.times.slice(0, n);
-  const ratios = [], actRef = [0], actClone = [0];
+  const ratios = [], actRef = [0], actClone = [0], rasterMotion = [];
   for (let k = 0; k < n; k++) {
     await lab.load(`r${k}`, join(refDir, 'motion', 'frames', `${pad(k)}.png`));
     await lab.load(`c${k}`, join(out, 'clone', 'motion', 'frames', `${pad(k)}.png`));
@@ -304,6 +311,7 @@ async function compareMotion(lab, meta, refDir, out, cloneMotion, tol, structura
     if (k) {
       actRef.push(await lab.activity(`r${k - 1}`, `r${k}`));
       actClone.push(await lab.activity(`c${k - 1}`, `c${k}`));
+      if (rasterFallback) rasterMotion.push(await lab.motionMatch(`r${k - 1}`, `r${k}`, `c${k - 1}`, `c${k}`));
       await lab.drop(`r${k - 1}`, `c${k - 1}`);
     }
   }
@@ -334,6 +342,11 @@ async function compareMotion(lab, meta, refDir, out, cloneMotion, tol, structura
   const timing = [onsetSettle(actRef, times), onsetSettle(actClone, times)];
   const lines = [`- mean frame difference ${(mean(ratios) * 100).toFixed(2)}%, worst ${(ratios[worstK] * 100).toFixed(2)}% at ${times[worstK]}ms`];
   const issues = [];
+  const rasterActive = rasterMotion.reduce((sum, frame) => sum + frame.active, 0);
+  const rasterFootprint = rasterActive ? (100 * rasterMotion.reduce((sum, frame) => sum + frame.matched, 0)) / rasterActive : null;
+  const rasterDirection = rasterActive ? (100 * rasterMotion.reduce((sum, frame) => sum + frame.directed, 0)) / rasterActive : null;
+  const rasterScore = rasterFootprint == null ? null : (rasterFootprint + rasterDirection) / 2;
+  if (rasterScore != null) lines.push(`- raster motion match ${rasterScore.toFixed(1)}% (footprint ${rasterFootprint.toFixed(1)}%, brightness direction ${rasterDirection.toFixed(1)}%, within ${rasterMotion[0].tolerance}px)`);
   let timingScore = null;
   if (timing[0] && timing[1]) {
     const [a, b] = timing;
@@ -351,6 +364,10 @@ async function compareMotion(lab, meta, refDir, out, cloneMotion, tol, structura
   let score;
   if (meta.kind === 'url') {
     ({ score } = scoreTracks(refMotion.tracks, cloneMotion.tracks, tol, structural, issues));
+    if (rasterFallback && rasterScore != null && rasterScore < score) {
+      score = rasterScore;
+      issues.push({ axis: 'motion', type: 'timing', gain: 100 - rasterScore, text: `visible raster motion matches in only ${rasterScore.toFixed(1)}% (footprint ${rasterFootprint.toFixed(1)}%, brightness direction ${rasterDirection.toFixed(1)}%)` });
+    }
   } else {
     score = timingScore == null ? frameScore : (timingScore * 100 + frameScore) / 2;
     issues.forEach((i) => (i.gain = (100 - score) / Math.max(1, issues.length)));

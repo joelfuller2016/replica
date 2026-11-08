@@ -7,6 +7,7 @@ function lab() {
   const images = new Map();
   const W = 0.5053, I = 0.299, Q = 0.1957; // YIQ perceptual weights
   const THRESHOLD = 35215 * 0.1 * 0.1; // max YIQ delta × (0.1)²: ignores differences the eye barely sees
+  const MOTION_THRESHOLD = THRESHOLD * 0.01; // small per-frame changes accumulate into visible motion
 
   const canvas = (w, h) => {
     const c = new OffscreenCanvas(Math.max(1, Math.round(w)), Math.max(1, Math.round(h)));
@@ -222,6 +223,63 @@ function lab() {
       return sum / (w * h * 765);
     },
 
+    // Compare where each side changes between adjacent frames, independent of static appearance.
+    // Cap analysis at roughly 1000px per dimension; one sample pixel is the match tolerance.
+    motionMatch(a0Key, a1Key, b0Key, b1Key) {
+      const frames = [a0Key, a1Key, b0Key, b1Key].map((key) => images.get(key));
+      const scale = Math.max(1, Math.ceil(Math.max(...frames.map((img) => Math.max(img.width, img.height))) / 1000));
+      const w = Math.max(1, Math.ceil(Math.max(...frames.map((img) => img.width)) / scale));
+      const h = Math.max(1, Math.ceil(Math.max(...frames.map((img) => img.height)) / scale));
+      const sample = (img) => {
+        const [, x] = canvas(w, h);
+        x.fillStyle = '#fff';
+        x.fillRect(0, 0, w, h);
+        x.drawImage(img, 0, 0, img.width / scale, img.height / scale);
+        return x.getImageData(0, 0, w, h).data;
+      };
+      const [a0, a1, b0, b1] = frames.map(sample);
+      const changes = (before, after) => {
+        const active = new Uint8Array(w * h);
+        const direction = new Int8Array(w * h);
+        for (let p = 0, i = 0; p < active.length; p++, i += 4) {
+          if (delta(before, i, after, i) <= MOTION_THRESHOLD) continue;
+          active[p] = 1;
+          const y = (after[i] - before[i]) * 0.29889531 + (after[i + 1] - before[i + 1]) * 0.58662247 + (after[i + 2] - before[i + 2]) * 0.11448223;
+          direction[p] = Math.sign(y);
+        }
+        return { active, direction };
+      };
+      const [A, B] = [changes(a0, a1), changes(b0, b1)];
+      const near = (M, x, y, direction) => {
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < w && yy < h) {
+            const i = yy * w + xx;
+            if (M.active[i] && (direction === undefined || M.direction[i] === direction)) return true;
+          }
+        }
+        return false;
+      };
+      let countA = 0, countB = 0, matchedA = 0, matchedB = 0, directedA = 0, directedB = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (A.active[i]) {
+          countA++;
+          matchedA += near(B, x, y) ? 1 : 0;
+          directedA += near(B, x, y, A.direction[i]) ? 1 : 0;
+        }
+        if (B.active[i]) {
+          countB++;
+          matchedB += near(A, x, y) ? 1 : 0;
+          directedB += near(A, x, y, B.direction[i]) ? 1 : 0;
+        }
+      }
+      const active = countA + countB;
+      const matched = matchedA + matchedB;
+      const directed = directedA + directedB;
+      return { score: active ? (50 * (matched + directed)) / active : 100, active, matched, directed, tolerance: scale };
+    },
+
     // Frames laid out in bands of 6 columns; each band has one row per sequence.
     async strip(rows, times, cell = 220) {
       const first = images.get(rows[0].keys[0]);
@@ -266,6 +324,7 @@ export async function openLab(browser) {
     compare: (a, b, opts) => page.evaluate(([a, b, o]) => window.lab.compare(a, b, o), [a, b, opts]),
     ratio: (a, b) => page.evaluate(([a, b]) => window.lab.ratio(a, b), [a, b]),
     activity: (a, b) => page.evaluate(([a, b]) => window.lab.activity(a, b), [a, b]),
+    motionMatch: (a0, a1, b0, b1) => page.evaluate((keys) => window.lab.motionMatch(...keys), [a0, a1, b0, b1]),
     strip: (rows, times) => page.evaluate(([r, t]) => window.lab.strip(r, t), [rows, times]),
     write,
     close: () => page.close(),

@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test/selftest.mjs"
+    "test": "npm run test:selftest && npm run test:regressions",
+    "test:selftest": "node test/selftest.mjs",
+    "test:regressions": "node test/regressions.mjs"
   },
   "dependencies": {
     "playwright": "^1.64.1"

@@ -33,14 +33,15 @@ Replica gives the agent what a careful frontend engineer would gather:
 - **Nested motion counted once.** When a card springs in, everything inside it moves too. That is one finding on the card ("12 elements inside move with it… fix it here and they follow"), not twelve. A child's own motion (a stagger, a pop, a spin) is still checked on its own.
 - **Placeholders don't count against you.** Mark a stand-in for an asset you can't reuse with `data-replica="placeholder"`. Its box is still checked; its pixels are left out of the pixel score and listed in the report. Text painted over it still counts.
 - **Technique-agnostic motion.** A CSS `@keyframes` reference and a Web Animations API or Framer Motion clone with the same timing score 100.
-- **Deterministic.** Pages run on a virtual clock with frozen CSS timelines, a seeded `Math.random`, and fixed time, locale and DPR. Stills are shot from the viewport, not a full-page resize that makes some sites re-lay out. Capturing a live, animated production site twice gives a 100/100 match, so every difference is real.
+- **Raster motion fallback for canvas-like pages.** It runs only when both reference and clone expose zero DOM motion tracks, then compares frame-to-frame changed-pixel footprints and signed luminance (brightness) changes. Frames are downsampled to about 1000px per dimension with a one-sample-pixel tolerance; its per-frame activity threshold is 1% of the static YIQ threshold. This is not optical flow or semantic motion equivalence: small per-frame changes can be missed, mixed DOM/canvas gaps are not covered, and strong contrast or palette inversions can affect brightness direction. Static branding is scored as pixels; the own-brand regression covers one fixture, not every rebrand.
+- **Repeatable under frozen conditions.** Pages run on a virtual clock with frozen CSS timelines, a seeded `Math.random`, and fixed time, locale and DPR. Stills are shot from the viewport, not a full-page resize that makes some sites re-lay out. Repeat captures help establish site stability; network responses, live content, and production experiments may still vary between runs.
 
 ## Install
 
 With the open [`skills`](https://github.com/vercel-labs/skills) CLI:
 
 ```bash
-npx skills add albertirgi/replica
+npx skills add joelfuller2016/replica
 ```
 
 Or by hand: copy `skills/replica` into your agent's skills folder (for Claude Code, `~/.claude/skills/replica` or `.claude/skills/replica` in a project). Then install its one dependency:
@@ -51,6 +52,16 @@ node ~/.claude/skills/replica/scripts/replica.mjs doctor
 ```
 
 Requirements: Node 20+. Replica uses Playwright's Chromium, or falls back to an installed Google Chrome. `ffmpeg` is needed only for video and GIF references. No API keys.
+
+For Codex on Windows, copy `skills/replica` to `%USERPROFILE%\.codex\skills\replica`, then install Chromium and check the CLI from PowerShell:
+
+```powershell
+$skill = Join-Path $env:USERPROFILE '.codex/skills/replica'
+Set-Location (Join-Path $skill 'scripts')
+npm install
+npx playwright install chromium
+node .\replica.mjs doctor
+```
 
 ## Use
 
@@ -129,8 +140,15 @@ node skills/replica/scripts/replica.mjs compare .replica/hero/ref http://localho
 ## Development
 
 ```bash
-cd skills/replica/scripts && npm install && npm test
+cd skills/replica/scripts
+npm ci
+npx playwright install chromium
+npm test
 ```
+
+Run `node test/selftest.mjs` to run the self-test alone. `npm test` runs the self-test and the deterministic comparison regressions. The CI workflow is configured for Windows and Ubuntu on Node 20 and 24, installing Chromium from the locked local Playwright dependency.
+
+The self-test resolves CLI and fixture URLs with Node's native file URL converter for Windows compatibility. The skill metadata also passes the local skill-creator validator.
 
 The self-test captures three fixture pages and compares clones against them.
 

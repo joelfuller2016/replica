@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Raster fade reversed control</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 320px; height: 200px; margin: 0; overflow: hidden; background: #f4f1ea; }
+    canvas { display: block; width: 320px; height: 200px; }
+  </style>
+</head>
+<body>
+  <canvas width="320" height="200"></canvas>
+  <script>
+    const context = document.querySelector('canvas').getContext('2d');
+    const start = performance.now();
+    function draw(now) {
+      context.fillStyle = '#f4f1ea';
+      context.fillRect(0, 0, 320, 200);
+      const phase = ((now - start) % 1000) / 1000;
+      const progress = phase < 0.5 ? phase * 2 : 2 - phase * 2;
+      const opacity = 0.5 - progress * 0.5;
+      context.fillStyle = `rgba(209, 73, 91, ${opacity})`;
+      context.beginPath();
+      context.arc(160, 100, 24, 0, Math.PI * 2);
+      context.fill();
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

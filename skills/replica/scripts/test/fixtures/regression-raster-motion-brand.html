@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Raster motion alternate brand</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 320px; height: 200px; margin: 0; overflow: hidden; background: #dce9f5; }
+    canvas { display: block; width: 320px; height: 200px; }
+  </style>
+</head>
+<body>
+  <canvas width="320" height="200"></canvas>
+  <script>
+    const canvas = document.querySelector('canvas');
+    const context = canvas.getContext('2d');
+    const start = performance.now();
+    function draw(now) {
+      context.fillStyle = '#dce9f5';
+      context.fillRect(0, 0, 320, 200);
+      context.fillStyle = '#568f74';
+      context.fillRect(260, 24, 36, 36);
+      const x = 24 + (((now - start) % 1000) / 1000) * 272;
+      context.fillStyle = '#d1495b';
+      context.beginPath();
+      context.arc(x, 120, 12, 0, Math.PI * 2);
+      context.fill();
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>
