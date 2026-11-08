@@ -1,0 +1,9 @@
+# Work journal
+
+## 2026-11-08 — Fork and verified-fix work started
+
+- User request: fork Replica, fix the reviewed issues, and test the tool on https://aiapply.co/. Created and independently verified joelfuller2016/replica as a fork of albertirgi/replica, based on current upstream main6e79299d9505f363b2bc08aad700ddcf4e3fe00c. New checkout C:/Users/Homepc/Projects/replica uses fix/windows-and-comparison-gates; the earlier detached review checkout and its evidence remain untouched.
+- Assigned separate core/scoring, compatibility/metadata/CI and plan/critique workers, with a completed public-site preflight. Requested gpt-6-luna/max/fork_turns none, preserving the coordinating agent's configuration; token/dollar telemetry is unavailable. Scope includes reproducing the canvas/raster inference before choosing a fix, preserving DOM/own-brand behavior, stock Windows tests and meaningful regression controls.
+- Live-trial acceptance: use the fixed, commit-pinned CLI with a fresh anonymous context against the public AIApply heading at desktop/mobile sizes, assess repeat capture and a deliberately mismatched synthetic local control, and inspect artifacts. Public GET independently returned200 and the observed heading id exists. No account login/storage, application forms, private data or paid product flows; raw site captures/logs stay ignored.
+- The authoritative plan is being authored under docs/plans/2026-11-08-replica-fixes-aiapply.md. User authorization covers the fork/fixes and the configured knowledge-repo reports; no upstream pull request was requested. Root JOURNAL publication is isolated from in-progress code edits.
+- Tool correction: this installed gh rejects --remote with an explicit repository argument; its own help supplied the supported --clone=false fork command. That command created the correct fork, then Git verified both origin and upstream. No existing account/configuration setting was changed.
